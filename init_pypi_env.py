@@ -17,7 +17,7 @@ def create_bandersnatch_conf():
     parser = SafeConfigParser()
     parser.read("bandersnatch/bandersnatch-default.conf")
     parser.set("mirror", "directory", "/www/mirrors/pypi")
-    parser.set("mirror", "workers", "10")
+    parser.set("mirror", "workers", "6")
     parser.set("statistics", "access-log-pattern",
                      "/var/log/pypi.mirrors.access.*.log")
 
@@ -53,6 +53,7 @@ def create_bandersnatch_log_conf():
     parser.add_section("logger_bandersnatch")
     parser.set("logger_bandersnatch", "level", "ERROR")
     parser.set("logger_bandersnatch", "handlers", "fileHandler")
+    parser.set("logger_bandersnatch", "qualname", "bandersnatch")
 
     parser.add_section("handler_fileHandler")
     parser.set("handler_fileHandler", "class", "FileHandler")
