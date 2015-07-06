@@ -5,32 +5,42 @@ import os.path
 from ConfigParser import SafeConfigParser
 from subprocess import call
 
-dirname = os.path.dirname(__file__)
-file_prefix = "bandersnatch/bandersnatch"
-
+MIRROR_DIR = "/www/mirrors/"
+BIN_DIR = os.path.join(MIRROR_DIR, "bin")
+LOG_DIR = os.path.join(MIRROR_DIR, "log")
+BANDERSNATCH_ENV_DIR = os.path.join(BIN_DIR, "bandersnatch")
+CONF_FILE_PREFIX = os.path.join(BANDERSNATCH_ENV_DIR, "bandersnatch")
+ACCESS_LOG_DIR = "/var/log/"
 
 def create_bandersnatch_conf():
-    if not os.path.isfile("bandersnatch/bandersnatch-default.conf"):
-        call(["bandersnatch/bin/bandersnatch",
-              "-c", "bandersnatch/bandersnatch-default.conf", "mirror"])
+    bs_default_conf = ''.join([CONF_FILE_PREFIX, "-default.conf"])
+    bs_debug_conf = ''.join([CONF_FILE_PREFIX, "-debug.conf"])
+    bs_log_conf = ''.join([CONF_FILE_PREFIX, "-log.conf"])
+    bs_conf = ''.join([CONF_FILE_PREFIX, ".conf"])
+    bs_bin = os.path.join(BANDERSNATCH_ENV_DIR, "bin/bandersnatch")
+
+    if not os.path.isfile(bs_default_conf):
+        call([bs_bin, "-c", bs_default_conf, "mirror"])
 
     parser = SafeConfigParser()
-    parser.read("bandersnatch/bandersnatch-default.conf")
-    parser.set("mirror", "directory", "/www/mirrors/pypi")
+    parser.read(bs_default_conf)
+    parser.set("mirror", "directory", os.path.join(MIRROR_DIR, "pypi"))
     parser.set("mirror", "workers", "6")
     parser.set("statistics", "access-log-pattern",
-                     "/var/log/pypi.mirrors.access.*.log")
+               os.path.join(ACCESS_LOG_DIR, "pypi.mirrors.access.*.log"))
 
-    with open(os.path.join(dirname, ''.join([file_prefix, "-debug.conf"])), 'w') as fp:
+    with open(bs_debug_conf, 'w') as fp:
         parser.write(fp)
 
-    parser.set("mirror", "log-config",
-                     "/www/mirrors/bin/bandersnatch/bandersnatch-log.conf")
-    with open(os.path.join(dirname, ''.join([file_prefix, ".conf"])), 'w') as fp:
+    parser.set("mirror", "log-config", bs_log_conf)
+    with open(bs_conf, 'w') as fp:
         parser.write(fp)
 
 
 def create_bandersnatch_log_conf():
+    bs_log_conf = ''.join([CONF_FILE_PREFIX, "-log.conf"])
+    pypi_error_log = os.path.join(LOG_DIR, "pypi_error.log")
+
     parser = SafeConfigParser()
     parser.add_section("loggers")
     parser.set("loggers", "keys", "root, bandersnatch")
@@ -58,9 +68,10 @@ def create_bandersnatch_log_conf():
     parser.add_section("handler_fileHandler")
     parser.set("handler_fileHandler", "class", "FileHandler")
     parser.set("handler_fileHandler", "formatter", "simpleFormatter")
-    parser.set("handler_fileHandler", "args", "(\"/www/mirrors/log/pypi_error.log\", 'a')")
+    file_handler_args = ''.join(["(\"", pypi_error_log, "\", 'a')"])
+    parser.set("handler_fileHandler", "args", file_handler_args)
 
-    with open(os.path.join(dirname, ''.join([file_prefix, "-log.conf"])), 'w') as fp:
+    with open(bs_log_conf, 'w') as fp:
         parser.write(fp)
 
 
@@ -69,8 +80,10 @@ def install_virtualenv():
 
 
 def create_bandersnatch_env():
-    call(["virtualenv", "bandersnatch"])
-    call(["bandersnatch/bin/pip", "install", "-r",
+    pip_bin = os.path.join(BANDERSNATCH_ENV_DIR, "bin/pip")
+
+    call(["virtualenv", BANDERSNATCH_ENV_DIR])
+    call([pip_bin, "install", "-r",
           "https://bitbucket.org/pypa/bandersnatch/raw/stable/requirements.txt"])
 
 
@@ -87,4 +100,3 @@ def test():
 
 if __name__ == "__main__":
     main()
-    # test()

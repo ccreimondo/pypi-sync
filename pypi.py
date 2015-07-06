@@ -6,79 +6,82 @@ import logging
 
 from subprocess import call, check_call, check_output
 
-log_dir = "/www/mirrors/log/"
-mirror_dir = "/www/mirrors"
+MIRROR_NAME = "pypi"
+MIRROR_DIR = "/www/mirrors"
+BIN_DIR = os.path.join(MIRROR_DIR, "bin")
+LOG_DIR = os.path.join(MIRROR_DIR, "log")
+BANDERSNATCH_ENV = os.path.join(BIN_DIR, "bandersnatch")
+BANDERSNATCH_BIN = os.path.join(BANDERSNATCH_ENV, "bin/bandersnatch")
+BS_CONF = os.path.join(BANDERSNATCH_ENV, "bandersnatch.conf")
+BS_DEBUG_CONF = os.path.join(BANDERSNATCH_ENV, "bandersnatch-debug.conf")
 
-
-def setup_pypi_logging():
+def setup_logging():
     """Logging for front-end to get sync state
 
     Returns:
         logger: logging instance
     """
-    pypi_log_file = os.path.join(log_dir, "pypi.log")
-    fh = logging.FileHandler(pypi_log_file)
+    log_file = os.path.join(LOG_DIR, ''.join([MIRROR_NAME, ".log"]))
+
+    fh = logging.FileHandler(log_file)
     fh.setLevel(logging.INFO)
     formatter = logging.Formatter(fmt="%(asctime)s - %(message)s",
                                   datefmt="%Y%m%d - %H:%M:%S")
     fh.setFormatter(formatter)
 
-    logger = logging.getLogger("pypi")
+    logger = logging.getLogger(MIRROR_DIR)
     logger.setLevel(logging.DEBUG)
     logger.addHandler(fh)
     return logger
 
 
 def du_size(mirror):
-    mirror_path = os.path.join(mirror_dir, mirror)
+    mirror_path = os.path.join(MIRROR_DIR, mirror)
     r = check_output(["du", "-s", mirror_path])
     return r.split("\n")[0].split("\t")[0]
 
  
 def get_size(stage):
-    pypi_mirror = "pypi"
-    pypi_log = os.path.join(log_dir, "pypi.log")
+    log_file = os.path.join(LOG_DIR, ''.join([MIRROR_NAME, ".log"]))
+
     if stage == "start":
-        with open(pypi_log, 'r') as log:
+        with open(log_file, 'r') as log:
             lines = log.readlines()
             if lines.__len__() == 0:
-                return du_size(pypi_mirror)
+                return du_size(MIRROR_NAME)
             last_size = lines[-1].split()[-1]
             return last_size
     elif stage == "end":
-        with open(pypi_log, 'r') as log:
+        with open(log_file, 'r') as log:
             lines = log.readlines()
 	    last_code = lines[-1].split()[-1]
             if last_code == '0':
-	         return du_size(pypi_mirror)
+	            return du_size(MIRROR_NAME)
             return lines[-2].split()[-1]
     return '0'
             
 
 def dry_run():
-    pypi_logger = setup_pypi_logging()
-    pypi_logger.info(" - ".join(["SyncStart", get_size("start")]))
+    logger = setup_logging()
+    logger.info(" - ".join(["SyncStart", get_size("start")]))
     for i in range(5):          # Try five times
-        rc = check_call(["bandersnatch/bin/bandersnatch",
-                         "-c", "bandersnatch/bandersnatch.conf", "mirror"])
+        rc = check_call([BANDERSNATCH_BIN, "-c", BS_CONF, "mirror"])
         if rc == 0:
-            pypi_logger.info(" - ".join(["SyncSuccd", str(rc)]))
+            logger.info(" - ".join(["SyncSuccd", str(rc)]))
             break
         elif i == 4:    
-            pypi_logger.info(" - ".join(["SyncError", str(rc)]))
-    pypi_logger.info(" - ".join(["SyncCompt", get_size("end")]))
+            logger.info(" - ".join(["SyncError", str(rc)]))
+    logger.info(" - ".join(["SyncCompt", get_size("end")]))
 
 
 def report():
-    call(["bandersnatch/bin/bandersnatch", 
-          "-c", "bandersnatch/bandersnatch.conf", "update-stats", 
+    # TODO
+    call([BANDERSNATCH_BIN, "-c", BS_CONF, "update-stats", 
           "|&", "logger", "-t", "bandersnatch[update-stats]"])
 
 
 def run_with_verbose():
-    call(["bandersnatch/bin/bandersnatch",
-          "-c", "bandersnatch/bandersnatch-debug.conf",
-          "mirror"])
+    call([BANDERSNATCH_BIN, "-c", BS_DEBUG_CONF, "mirror"])
 
 
 def main(argv):
@@ -90,7 +93,8 @@ def main(argv):
         pass
 	# report()
     else:
-        print "usage: python pypi.py [-v|-u]"
+        usage_msg = ' '.join(["usage:", "python", __file__, "[-v|-u]"])
+        print usage_msg
 
 
 def test():
